@@ -1,21 +1,17 @@
 export class EmployeeModel {
-    empId: number;
+    _id?: string;
     name: string;
-    city: string;
-    state: string;
     email: string;
-    contactNo: string;
+    position: string;
+    phone: string;
     address: string;
-    pinCode: string;
 
     constructor() {
-        this.empId = 0;
+        this._id = '';
         this.name = '';
-        this.city = '';
-        this.state = '';
         this.email = '';
-        this.contactNo = '';
+        this.position = '';
+        this.phone = '';
         this.address = '';
-        this.pinCode = '';
     }
 }

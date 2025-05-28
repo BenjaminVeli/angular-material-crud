@@ -1,0 +1,12 @@
+<div class="input-group mb-3">
+  <input
+    type="text"
+    class="form-control"
+    placeholder="Buscar empleado..."
+    #searchBox
+    (keyup.enter)="onSearch(searchBox.value)"
+  />
+  <button class="btn btn-outline-secondary" type="button" (click)="onSearch(searchBox.value)">
+    Buscar
+  </button>
+</div>

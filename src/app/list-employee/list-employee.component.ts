@@ -1,65 +1,151 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { ReactiveFormsModule } from '@angular/forms';
 import { EmployeeModel } from '../model/Employee';
+import { Title } from '@angular/platform-browser';
+import { EmployeeService } from '../core/services/employee.service';
+import { NgFor, NgIf } from '@angular/common';
+import { Subject, takeUntil } from 'rxjs';
+import { SearchComponent } from '../shared/components/search/search.component';
 
 @Component({
   selector: 'app-list-employee',
   standalone: true,
-  imports: [RouterLink, ReactiveFormsModule],
+  imports: [
+    SearchComponent,
+    RouterLink,
+    ReactiveFormsModule,
+    NgFor,
+    NgIf
+  ],
+  
+  // Sin providers - HttpClient viene de main.ts
   templateUrl: './list-employee.component.html',
   styleUrl: './list-employee.component.scss'
 })
-export class ListEmployeeComponent {
-  employeeForm: FormGroup = new FormGroup({});
-
-  employeeObj: EmployeeModel = new EmployeeModel();
-
+export class ListEmployeeComponent implements OnInit, OnDestroy {
   employeeList: EmployeeModel[] = [];
+  isLoading = false;
+  deletingEmployeeId: string | null = null;
+  
+  // Para manejar subscripciones y evitar memory leaks
+  private destroy$ = new Subject<void>();
 
-  constructor() {
-    this.createForm();
-    // debugger;
-    const oldData = localStorage.getItem('EmpData');
-    if (oldData != null) {
-      const parseData = JSON.parse(oldData);
-      this.employeeList = parseData;
+  constructor(
+    private titulo: Title,
+    private employeeService: EmployeeService
+  ) {
+    this.titulo.setTitle("List Employee");
+  }
+
+  ngOnInit(): void {
+    this.loadEmployees();
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  private loadEmployees(): void {
+    this.isLoading = true;
+    this.employeeService.getEmployees()
+      .pipe(takeUntil(this.destroy$)) // Evita memory leaks
+      .subscribe({
+        next: (data: EmployeeModel[]) => {
+          this.employeeList = data;
+          this.isLoading = false;
+        },
+        error: (error) => {
+          console.error('Error loading employees:', error);
+          this.isLoading = false;
+          
+          // Manejo específico de errores
+          let errorMessage = 'Error al cargar empleados.';
+          
+          if (error.status === 0) {
+            errorMessage = 'No se puede conectar al servidor. Verifica tu conexión.';
+          } else if (error.status === 500) {
+            errorMessage = 'Error interno del servidor.';
+          } else if (error.error?.message) {
+            errorMessage = error.error.message;
+          }
+          
+          alert(errorMessage);
+        }
+      });
+  }
+
+  onDelete(_id: string): void {
+    // Validar que el ID existe
+    if (!_id) {
+      alert('Error: ID de empleado no válido.');
+      return;
+    }
+
+    // Confirmar eliminación
+    const employee = this.employeeList.find(emp => emp._id === _id);
+    const employeeName = employee?.name || 'este empleado';
+    
+    if (confirm(`¿Estás seguro de eliminar a ${employeeName}? Esta acción no se puede deshacer.`)) {
+      this.deletingEmployeeId = _id; // Para mostrar loading en el botón específico
+      
+      this.employeeService.deleteEmployee(_id)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: () => {
+            console.log('Employee deleted successfully');
+            
+            // Eliminar de la lista local sin recargar todo
+            this.employeeList = this.employeeList.filter(emp => emp._id !== _id);
+            
+            // Mostrar mensaje de éxito
+            alert(`${employeeName} ha sido eliminado exitosamente.`);
+            
+            this.deletingEmployeeId = null;
+          },
+          error: (error) => {
+            console.error('Error deleting employee:', error);
+            this.deletingEmployeeId = null;
+            
+            // Manejo específico de errores de eliminación
+            let errorMessage = 'Error al eliminar empleado. Por favor, inténtalo de nuevo.';
+            
+            if (error.status === 404) {
+              errorMessage = 'El empleado no existe o ya fue eliminado.';
+              // Recargar la lista para sincronizar
+              this.loadEmployees();
+            } else if (error.status === 400) {
+              errorMessage = 'No se puede eliminar este empleado. Verifica que no tenga registros dependientes.';
+            } else if (error.status === 500) {
+              errorMessage = 'Error interno del servidor. Contacta al administrador.';
+            } else if (error.status === 0) {
+              errorMessage = 'No se puede conectar al servidor. Verifica tu conexión.';
+            } else if (error.error?.message) {
+              errorMessage = error.error.message;
+            }
+            
+            alert(errorMessage);
+          }
+        });
     }
   }
 
-  createForm() {
-    this.employeeForm = new FormGroup({
-      empid: new FormControl(this.employeeObj.empId),
-      name: new FormControl(this.employeeObj.name),
-      city: new FormControl(this.employeeObj.city),
-      address: new FormControl(this.employeeObj.address),
-      contactNo: new FormControl(this.employeeObj.contactNo),
-      email: new FormControl(this.employeeObj.email),
-      pinCode: new FormControl(this.employeeObj.pinCode),
-      state: new FormControl(this.employeeObj.state),
+  onSearch(term: string) {
+  this.employeeService.getEmployeeByName(term)
+    .pipe(takeUntil(this.destroy$))
+    .subscribe(data => {
+      this.employeeList = data;
     });
+}
+
+  // Método helper para verificar si un empleado específico se está eliminando
+  isDeletingEmployee(_id: string): boolean {
+    return this.deletingEmployeeId === _id;
   }
 
-  onEdit(item: EmployeeModel) {
-    this.employeeObj = item;
-    this.createForm();
+  // Método para refrescar la lista manualmente
+  refreshList(): void {
+    this.loadEmployees();
   }
-
-  onUpdate() {
-    const record = this.employeeList.find(m => m.empId == this.employeeForm.controls['empid'].value);
-    if (record != undefined) {
-      record.address = this.employeeForm.controls['address'].value;
-      record.name = this.employeeForm.controls['name'].value;
-      record.contactNo = this.employeeForm.controls['contactNo'].value;
-      record.city = this.employeeForm.controls['city'].value;
-      record.pinCode = this.employeeForm.controls['pinCode'].value;
-      record.state = this.employeeForm.controls['state'].value;
-      record.email = this.employeeForm.controls['email'].value;
-    }
-    localStorage.setItem("EmpData", JSON.stringify(this.employeeList));
-    this.employeeObj = new EmployeeModel();
-    this.createForm();
-  }
-
-
 }
