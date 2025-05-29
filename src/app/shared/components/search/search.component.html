@@ -2,11 +2,17 @@
   <input
     type="text"
     class="form-control"
-    placeholder="Buscar empleado..."
-    #searchBox
-    (keyup.enter)="onSearch(searchBox.value)"
+    placeholder="Ingrese el nombre..."
+    [formControl]="searchControl"
   />
-  <button class="btn btn-outline-secondary" type="button" (click)="onSearch(searchBox.value)">
+
+  <!-- Botón de búsqueda manual (opcional, ya que busca automáticamente) -->
+  <button 
+    class="btn btn-outline-secondary" 
+    type="button" 
+    (click)="onSearch()"
+    title="Buscar"
+  >
     Buscar
   </button>
 </div>

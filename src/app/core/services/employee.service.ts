@@ -48,9 +48,4 @@ export class EmployeeService {
             this.httpOptions
         );
     }
-
-    getEmployeeByName(name: string): Observable<EmployeeModel[]> {
-        console.log('Searching for employee with name:', name); // Debugging
-        return this.http.get<EmployeeModel[]>(`${this.apiUrl}/search-employee/${name}`);
-    }
 }
